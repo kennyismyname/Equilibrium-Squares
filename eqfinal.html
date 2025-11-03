@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Black & White Square Simulation — Final</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{
+      --bg:#f3f6fb;
+      --card:#ffffff;
+      --muted:#6b7280;
+      --accent:#2563eb; /* blue */
+      --accent-2:#60a5fa;
+      --cell-shadow: 0 6px 18px rgba(37,99,235,0.06);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;background: linear-gradient(180deg,var(--bg),#eef4ff);color:#0f172a;padding:28px;display:flex;justify-content:center;align-items:center}
+
+    .app{width:100%;max-width:1100px;background:var(--card);border-radius:14px;padding:22px;box-shadow: 0 8px 30px rgba(15,23,42,0.08);display:grid;grid-template-columns:minmax(380px, 420px) 1fr;gap:18px;align-items:start}
+
+    header{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px}
+    header h1{font-size:18px;margin:0;letter-spacing:-0.2px}
+    header p{margin:0;color:var(--muted);font-size:13px}
+
+    .controls{background:linear-gradient(180deg,#ffffff, #fbfdff);padding:14px;border-radius:10px;box-shadow: var(--cell-shadow);}
+    .controls .row{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+    .controls label{font-size:13px;color:var(--muted);min-width:120px}
+    input[type="number"]{width:100px;padding:8px;border-radius:8px;border:1px solid #e6eefc;background:#fbfdff}
+    .btn{background:var(--accent);color:white;border:none;padding:8px 12px;border-radius:10px;cursor:pointer;box-shadow: 0 6px 16px rgba(37,99,235,0.12);transition:transform .08s ease}
+    .btn.secondary{background: transparent;color:var(--accent);border:1px solid rgba(37,99,235,0.12);box-shadow:none}
+    .btn:active { transform:translateY(1px)}
+
+    .small{padding:6px 10px;font-size:13px;border-radius:8px}
+    .muted{color:var(--muted);font-size:13px}
+
+    .boardCard{padding:14px;border-radius:10px;background:linear-gradient(180deg,#ffffff, #fbfdff);box-shadow: var(--cell-shadow);display:flex;flex-direction:column;align-items:center}
+
+    #boardWrap{width:100%;display:flex;justify-content:center;align-items:center}
+    #board{display:grid;gap:4px;transition: all .18s ease;background:linear-gradient(180deg,#f8fbff,#ffffff);padding:8px;border-radius:10px}
+    .cell{width:28px;height:28px;border-radius:6px;transition:background .18s ease, transform .12s ease;box-shadow: 0 2px 6px rgba(12,14,20,0.06) inset;border: 1px solid rgba(15,23,42,0.04)}
+    .cell.black{background:#0b1220}
+    .cell.white{background:white;box-shadow: 0 2px 10px rgba(99,102,241,0.03);}
+
+    .stats{display:flex;gap:10px;margin-top:12px;align-items:center}
+    .stat{background:linear-gradient(180deg,#fbfdff,#ffffff);padding:8px 12px;border-radius:8px;box-shadow: 0 6px 18px rgba(2,6,23,0.02)}
+    .stat b{display:block;font-size:18px}
+    .chartCard{padding:12px;border-radius:10px;background:linear-gradient(180deg,#ffffff,#fbfdff);box-shadow: var(--cell-shadow);}
+
+    .flex{display:flex;gap:8px;align-items:center}
+    .spacer{flex:1}
+
+    footer{grid-column:1/-1;margin-top:6px;text-align:right;font-size:12px;color:var(--muted)}
+
+    @media (max-width: 980px){
+      .app{grid-template-columns: 1fr;padding:14px}
+      #board { transform:scale(.93)}
+    }
+  </style>
+</head>
+<body>
+  <div class="app" role="application" aria-label="Black and White Simulation">
+    <header>
+      <div>
+        <h1>Black & White Simulation</h1>
+        <p class="muted">Adjust rules, add squares, reset & replay — expandable grid with live chart.</p>
+      </div>
+      <div class="flex">
+        <button id="downloadBtn" class="btn small">Download CSV</button>
+        <button id="replayBtn" class="btn secondary small">Replay</button>
+      </div>
+    </header>
+
+    <div>
+      <div class="controls">
+        <div class="row">
+          <label>Start White (initial):</label>
+          <input id="startWhite" type="number" min="0" value="0" />
+          <div class="spacer"></div>
+          <button id="initBtn" class="btn small">Initialize</button>
+        </div>
+        <div class="row">
+          <label>White → Black (%)</label>
+          <input id="whiteToBlack" type="range" min="0" max="100" value="50" />
+          <span id="w2bLabel" class="muted">50%</span>
+        </div>
+        <div class="row">
+          <label>Black → White (%)</label>
+          <input id="blackToWhite" type="range" min="0" max="100" value="25" />
+          <span id="b2wLabel" class="muted">25%</span>
+        </div>
+        <div class="row">
+          <label>Add White</label>
+          <input id="addWhite" type="number" min="0" value="0" />
+          <label style="min-width:70px">Add Black</label>
+          <input id="addBlack" type="number" min="0" value="0" />
+        </div>
+        <div class="row" style="justify-content: flex-end; margin-top:-5px; margin-bottom:10px;">
+          <div class="spacer"></div>
+          <button id="addBtn" class="btn small">Add Squares</button>
+        </div>
+        <div class="row">
+          <label>Step Controls</label>
+          <button id="stepBtn" class="btn small">Next Step</button>
+          <button id="resetBtn" class="btn secondary small">Reset</button>
+          <button id="autoBtn" class="btn secondary small">Auto: Off</button>
+          <div class="spacer"></div>
+          <label class="muted">Speed</label>
+          <input id="speed" type="range" min="100" max="2000" value="600" />
+        </div>
+      </div>
+
+      <div style="height:14px"></div>
+
+      <div class="boardCard">
+        <div id="boardWrap">
+          <div id="board"></div>
+        </div>
+         <div class="stats">
+          <div class="stat">Step <b id="stepCounter">0</b></div>
+          <div class="stat">White <b id="whiteCount">0</b></div>
+          <div class="stat">Black <b id="blackCount">0</b></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chartCard">
+       <canvas id="chart"></canvas>
+      <div style="margin-top: 15px;">
+        <div class="flex" style="justify-content: space-between; align-items: flex-end;">
+          <h3 style="font-size: 14px; margin-bottom: 5px;">History (most recent steps)</h3>
+          <button id="clearHistory" class="btn secondary small">Clear History</button>
+        </div>
+        <p class="muted" style="font-size: 12px; margin-top: 0;">The simulation stores a snapshot of the grid each step so you can replay or download counts as CSV.</p>
+      </div>
+    </div>
+
+    <footer>
+      Simulation created by Gemini.
+    </footer>
+  </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // --- STATE ---
+  let grid = [];            // array of 'white'|'black'
+  let initialGrid = [];     // snapshot to reset to
+  let history = [];         // {step, white, black, gridSnapshot}
+  let stepNumber = 0;
+  let autoRun = false;
+  let autoTimer = null;
+  let defaultSize = 10; // start 10x10
+
+  // --- DOM ELEMENTS ---
+  // Controls
+  const startWhiteInput = document.getElementById('startWhite');
+  const initBtn = document.getElementById('initBtn');
+  const w2bRange = document.getElementById('whiteToBlack');
+  const b2wRange = document.getElementById('blackToWhite');
+  const w2bLabel = document.getElementById('w2bLabel');
+  const b2wLabel = document.getElementById('b2wLabel');
+  const addWhiteInput = document.getElementById('addWhite');
+  const addBlackInput = document.getElementById('addBlack');
+  const addBtn = document.getElementById('addBtn');
+  const stepBtn = document.getElementById('stepBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const autoBtn = document.getElementById('autoBtn');
+  const speedInput = document.getElementById('speed');
+  
+  // Board & Stats
+  const boardEl = document.getElementById('board');
+  const stepCounterEl = document.getElementById('stepCounter');
+  const whiteCountEl = document.getElementById('whiteCount');
+  const blackCountEl = document.getElementById('blackCount');
+  
+  // Header & History
+  const downloadBtn = document.getElementById('downloadBtn');
+  const replayBtn = document.getElementById('replayBtn');
+  const clearHistoryBtn = document.getElementById('clearHistory');
+
+  // --- CHART.JS SETUP ---
+  const ctx = document.getElementById('chart').getContext('2d');
+  const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [0],
+      datasets: [
+        { label: 'White', data: [0], borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.08)', tension:0.2, fill: true },
+        { label: 'Black', data: [100], borderColor: '#0f172a', backgroundColor: 'rgba(15,23,42,0.06)', tension:0.2, fill: true }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      scales: {
+        y: { beginAtZero: true, max: 100, title: { display: true, text: 'Percentage of Squares (%)'}},
+        x: { title: { display:true, text: 'Step' } }
+      },
+      plugins: { 
+        legend: { position: 'top' },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              let label = context.dataset.label || '';
+              if (label) label += ': ';
+              if (context.parsed.y !== null) label += context.parsed.y.toFixed(2) + '%';
+              return label;
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // --- HELPER FUNCTIONS ---
+  const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+
+  function computeGridSize(total) {
+    return Math.ceil(Math.sqrt(total));
+  }
+  
+  function shuffleArray(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
+
+  function padToPerfectSquare(arr) {
+    const size = computeGridSize(arr.length);
+    const newTotal = size * size;
+    while (arr.length < newTotal) arr.push('black'); // Pad with black
+    return arr;
+  }
+  
+  function getCounts() {
+    let white = 0;
+    let black = 0;
+    grid.forEach(color => {
+      if (color === 'white') white++;
+      else if (color === 'black') black++;
+    });
+    return { white, black };
+  }
+
+  // --- CORE RENDER & UPDATE FUNCTIONS ---
+  function renderBoard() {
+    const total = grid.length;
+    const dim = computeGridSize(total);
+    boardEl.style.gridTemplateColumns = `repeat(${dim}, 28px)`;
+    boardEl.style.gridTemplateRows = `repeat(${dim}, 28px)`;
+    
+    // ensure right number of elements
+    while (boardEl.children.length > grid.length) boardEl.removeChild(boardEl.lastChild);
+    while (boardEl.children.length < grid.length) {
+      const d = document.createElement('div');
+      d.className = 'cell';
+      boardEl.appendChild(d);
+    }
+    // update classes
+    for (let i=0;i<grid.length;i++){
+      boardEl.children[i].className = 'cell ' + grid[i];
+    }
+    updateCounts();
+  }
+
+  function updateCounts() {
+    const { white, black } = getCounts();
+    whiteCountEl.textContent = white;
+    blackCountEl.textContent = black;
+    stepCounterEl.textContent = stepNumber;
+  }
+
+  function recordHistory(atStep) {
+    const { white, black } = getCounts();
+    const total = white + black;
+    const whitePercent = total === 0 ? 0 : (white / total) * 100;
+    const blackPercent = total === 0 ? 0 : (black / total) * 100;
+
+    history.push({ 
+      step: atStep, 
+      white: white, 
+      black: black, 
+      whitePercent: whitePercent,
+      blackPercent: blackPercent,
+      gridSnapshot: grid.slice() 
+    });
+    
+    // Update chart data from history
+    chart.data.labels = history.map(h => h.step);
+    chart.data.datasets[0].data = history.map(h => h.whitePercent);
+    chart.data.datasets[1].data = history.map(h => h.blackPercent);
+    chart.update();
+  }
+
+  // --- SIMULATION LOGIC ---
+
+  function initialize() {
+    stopAuto();
+    const startWhite = clamp(parseInt(startWhiteInput.value) || 0, 0, Infinity);
+    const baseTotal = Math.max(defaultSize*defaultSize, startWhite);
+    grid = Array(baseTotal).fill('black');
+    
+    // Pick random indices for white squares
+    let indices = Array.from({length: baseTotal}, (_,i)=>i);
+    shuffleArray(indices);
+    indices.slice(0, startWhite).forEach(i => grid[i]='white');
+    
+    padToPerfectSquare(grid);
+    
+    // Reset counters & history
+    stepNumber = 0;
+    history = [];
+    initialGrid = grid.slice(); // Save for reset
+    
+    renderBoard();
+    recordHistory(0); // Record initial state as step 0
+  }
+
+  /**
+   * THIS IS THE CORRECTED, PERCENTAGE-BASED LOGIC
+   */
+  function nextStep() {
+    if (grid.length === 0) return;
+    
+    const w2b = clamp(parseInt(w2bRange.value),0,100);
+    const b2w = clamp(parseInt(b2wRange.value),0,100);
+
+    // 1. Find all white and black squares
+    const whiteIndices = [];
+    const blackIndices = [];
+    grid.forEach((cell, index) => {
+      if (cell === 'white') whiteIndices.push(index);
+      else blackIndices.push(index);
+    });
+
+    // 2. Calculate how many to flip
+    const numWToFlip = Math.floor(whiteIndices.length * w2b / 100);
+    const numBToFlip = Math.floor(blackIndices.length * b2w / 100);
+
+    // 3. Randomly select which ones to flip
+    shuffleArray(whiteIndices);
+    shuffleArray(blackIndices);
+    
+    const newGrid = grid.slice(); // Copy the grid
+
+    // 4. Flip White -> Black
+    whiteIndices.slice(0, numWToFlip).forEach(i => newGrid[i] = 'black');
+    
+    // 5. Flip Black -> White
+    blackIndices.slice(0, numBToFlip).forEach(i => newGrid[i] = 'white');
+
+    grid = newGrid;
+    stepNumber++;
+    renderBoard();
+    recordHistory(stepNumber);
+  }
+
+  /**
+   * THIS IS THE CORRECTED addSquares LOGIC
+   */
+  function addSquares(whiteToAdd, blackToAdd) {
+    if (whiteToAdd <= 0 && blackToAdd <= 0) return;
+    
+    whiteToAdd = Math.max(0, Math.floor(whiteToAdd || 0));
+    blackToAdd = Math.max(0, Math.floor(blackToAdd || 0));
+    
+    const added = [];
+    for (let i=0;i<whiteToAdd;i++) added.push('white');
+    for (let i=0;i<blackToAdd;i++) added.push('black');
+    
+    grid = grid.concat(added);
+    padToPerfectSquare(grid);
+    
+    // Re-render and record history AT THE CURRENT STEP
+    // This creates the vertical jump on the chart (the "stress")
+    renderBoard();
+    recordHistory(stepNumber); 
+    
+    // Clear inputs
+    addWhiteInput.value = '0'; 
+    addBlackInput.value='0'; 
+  }
+
+  function resetSimulation() {
+    if (!initialGrid || initialGrid.length === 0) return initialize();
+    stopAuto();
+    grid = initialGrid.slice();
+    stepNumber = 0;
+    history = [];
+    renderBoard();
+    recordHistory(0); // Record initial state
+  }
+
+  // --- AUTO-RUN & REPLAY LOGIC ---
+  function autoRunLoop() {
+    if (!autoRun) return; // Stop if autoRun is turned off
+    nextStep(); 
+    const speed = 2100 - parseInt(speedInput.value); // Invert speed slider
+    autoTimer = setTimeout(autoRunLoop, speed);
+  }
+
+  function startAuto() {
+    if (autoRun) return;
+    autoRun = true;
+    autoBtn.textContent = 'Auto: On';
+    autoBtn.classList.remove('secondary');
+    autoBtn.classList.add('btn');
+    autoRunLoop();
+  }
+
+  function stopAuto() {
+    if (!autoRun) return;
+    autoRun = false;
+    autoBtn.textContent = 'Auto: Off';
+    autoBtn.classList.add('secondary');
+    autoBtn.classList.remove('btn');
+    clearTimeout(autoTimer);
+    autoTimer = null;
+  }
+
+  function replayHistory() {
+    if (history.length === 0) return;
+    stopAuto();
+    let i = 0;
+    const speed = 2100 - parseInt(speedInput.value);
+    replayBtn.disabled = true;
+    
+    const t = setInterval(() => {
+      const snap = history[i];
+      if (!snap) { 
+        clearInterval(t); 
+        replayBtn.disabled = false; 
+        return; 
+      }
+      grid = snap.gridSnapshot.slice();
+      stepNumber = snap.step;
+      renderBoard();
+      i++;
+      if (i >= history.length) {
+        clearInterval(t);
+        replayBtn.disabled = false;
+      }
+    }, speed);
+  }
+
+  // --- CSV DOWNLOAD ---
+  function downloadCSV() {
+    if (history.length === 0) return;
+    const rows = [['Step', 'White (Count)', 'Black (Count)', 'White (%)', 'Black (%)']];
+    for (const h of history) {
+      rows.push([h.step, h.white, h.black, h.whitePercent.toFixed(2), h.blackPercent.toFixed(2)]);
+    }
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'bw_sim_history.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  // --- UI BINDINGS ---
+  initBtn.addEventListener('click', initialize);
+  stepBtn.addEventListener('click', nextStep);
+  resetBtn.addEventListener('click', resetSimulation);
+  addBtn.addEventListener('click', () => {
+    addSquares(parseInt(addWhiteInput.value), parseInt(addBlackInput.value));
+  });
+  autoBtn.addEventListener('click', () => {
+    if (autoRun) stopAuto(); else startAuto();
+  });
+  
+  downloadBtn.addEventListener('click', downloadCSV);
+  replayBtn.addEventListener('click', replayHistory);
+  clearHistoryBtn.addEventListener('click', () => {
+    history = [];
+    chart.data.labels = [];
+    chart.data.datasets[0].data = [];
+    chart.data.datasets[1].data = [];
+    chart.update();
+  });
+
+  w2bRange.addEventListener('input', () => w2bLabel.textContent = w2bRange.value + '%');
+  b2wRange.addEventListener('input', () => b2wLabel.textContent = b2wRange.value + '%');
+  
+  // --- INITIAL SETUP ---
+  initialize();
+});
+</script>
+</body>
+</html>
